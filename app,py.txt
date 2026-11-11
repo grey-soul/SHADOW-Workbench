@@ -1,0 +1,246 @@
+#!/usr/bin/env python3
+
+import hashlib
+import ipaddress
+import json
+import re
+import socket
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
+from urllib.parse import urlparse
+
+HOST = "127.0.0.1"
+PORT = 8080
+BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"
+MAX_BODY_SIZE = 100 * 1024
+
+
+def send_json(handler, data, status=200):
+    response = json.dumps(data).encode("utf-8")
+    handler.send_response(status)
+    handler.send_header("Content-Type", "application/json; charset=utf-8")
+    handler.send_header("Content-Length", str(len(response)))
+    handler.send_header("Cache-Control", "no-store")
+    handler.end_headers()
+    handler.wfile.write(response)
+
+
+def read_json(handler):
+    try:
+        length = int(handler.headers.get("Content-Length", "0"))
+    except ValueError:
+        raise ValueError("Invalid request length.")
+
+    if length <= 0 or length > MAX_BODY_SIZE:
+        raise ValueError("Request must be between 1 byte and 100 KB.")
+
+    raw = handler.rfile.read(length)
+    try:
+        return json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        raise ValueError("Invalid JSON request.")
+
+
+def valid_domain(value):
+    value = value.strip().rstrip(".")
+
+    if not value or len(value) > 253:
+        raise ValueError("Enter a valid domain name.")
+
+    try:
+        ascii_domain = value.encode("idna").decode("ascii")
+    except UnicodeError:
+        raise ValueError("Invalid domain name.")
+
+    labels = ascii_domain.split(".")
+
+    if len(labels) < 2:
+        raise ValueError("Enter a complete domain, such as example.com.")
+
+    for label in labels:
+        if (
+            not label
+            or len(label) > 63
+            or not re.fullmatch(r"[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?", label)
+        ):
+            raise ValueError("Invalid domain format.")
+
+    return ascii_domain
+
+
+class ShadowHandler(BaseHTTPRequestHandler):
+
+    def log_message(self, format_string, *args):
+        print("[SHADOW] " + format_string % args)
+
+    def do_GET(self):
+        if self.path == "/api/health":
+            return send_json(self, {
+                "status": "online",
+                "application": "SHADOW",
+                "version": "1.0.0"
+            })
+
+        if self.path not in ("/", "/index.html"):
+            return send_json(self, {"error": "Not found."}, 404)
+
+        index_file = STATIC_DIR / "index.html"
+
+        if not index_file.is_file():
+            return send_json(self, {"error": "Dashboard file not found."}, 500)
+
+        content = index_file.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(content)))
+        self.end_headers()
+        self.wfile.write(content)
+
+    def do_POST(self):
+        routes = {
+            "/api/dns": self.handle_dns,
+            "/api/hash": self.handle_hash,
+            "/api/url": self.handle_url
+        }
+
+        handler = routes.get(self.path)
+
+        if handler is None:
+            return send_json(self, {"error": "Endpoint not found."}, 404)
+
+        try:
+            data = read_json(self)
+            if not isinstance(data, dict):
+                raise ValueError("Request must be a JSON object.")
+            handler(data)
+        except ValueError as error:
+            send_json(self, {"error": str(error)}, 400)
+        except Exception:
+            send_json(self, {"error": "An unexpected server error occurred."}, 500)
+
+    def handle_dns(self, data):
+        domain = valid_domain(str(data.get("domain", "")))
+
+        try:
+            results = socket.getaddrinfo(
+                domain,
+                None,
+                family=socket.AF_UNSPEC,
+                type=socket.SOCK_STREAM
+            )
+        except socket.gaierror:
+            return send_json(self, {
+                "domain": domain,
+                "addresses": [],
+                "message": "No DNS records could be resolved by the system resolver."
+            })
+
+        addresses = sorted({
+            item[4][0] for item in results
+        })
+
+        send_json(self, {
+            "domain": domain,
+            "addresses": addresses,
+            "count": len(addresses)
+        })
+
+    def handle_hash(self, data):
+        value = data.get("text", "")
+
+        if not isinstance(value, str):
+            raise ValueError("Text must be a string.")
+
+        if len(value.encode("utf-8")) > MAX_BODY_SIZE:
+            raise ValueError("Text is too large. Maximum size is 100 KB.")
+
+        raw = value.encode("utf-8")
+
+        send_json(self, {
+            "sha256": hashlib.sha256(raw).hexdigest(),
+            "sha1": hashlib.sha1(raw).hexdigest(),
+            "md5": hashlib.md5(raw).hexdigest()
+        })
+
+    def handle_url(self, data):
+        value = data.get("url", "")
+
+        if not isinstance(value, str):
+            raise ValueError("URL must be a string.")
+
+        value = value.strip()
+
+        if not value or len(value) > 2048:
+            raise ValueError("Enter a URL up to 2048 characters.")
+
+        if any(ord(char) < 32 or ord(char) == 127 for char in value):
+            raise ValueError("URL contains invalid control characters.")
+
+        if "://" not in value:
+            value = "https://" + value
+
+        try:
+            parsed = urlparse(value)
+            hostname = parsed.hostname
+            port = parsed.port
+        except ValueError:
+            raise ValueError("Invalid URL or port.")
+
+        if parsed.scheme not in ("http", "https") or not hostname:
+            raise ValueError("Only valid HTTP and HTTPS URLs are supported.")
+
+        try:
+            ascii_host = hostname.encode("idna").decode("ascii")
+        except UnicodeError:
+            raise ValueError("Invalid hostname.")
+
+        try:
+            ip = ipaddress.ip_address(ascii_host)
+            host_type = "IP address"
+            public_candidate = ip.is_global
+        except ValueError:
+            host_type = "Domain name"
+            public_candidate = None
+
+        send_json(self, {
+            "original_url": value,
+            "scheme": parsed.scheme,
+            "hostname": ascii_host,
+            "port": port or (443 if parsed.scheme == "https" else 80),
+            "path": parsed.path or "/",
+            "query_present": bool(parsed.query),
+            "fragment_present": bool(parsed.fragment),
+            "host_type": host_type,
+            "public_ip_candidate": public_candidate,
+            "note": "Static inspection only. No connection was made to the URL."
+        })
+
+
+def main():
+    if not STATIC_DIR.is_dir():
+        print("[ERROR] The static folder is missing.")
+        return
+
+    server = HTTPServer((HOST, PORT), ShadowHandler)
+
+    print("")
+    print("====================================")
+    print("          SHADOW v1.0.0")
+    print("====================================")
+    print("[+] Server: ONLINE")
+    print(f"[+] Dashboard: http://{HOST}:{PORT}")
+    print("[+] Press CTRL+C to stop.")
+    print("====================================")
+    print("")
+
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\n[SHADOW] Server stopped.")
+    finally:
+        server.server_close()
+
+
+if __name__ == "__main__":
+    main()

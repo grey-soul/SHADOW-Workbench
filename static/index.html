@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#07130d">
+    <title>SHADOW | Intelligence Workbench</title>
+
+    <style>
+        :root {
+            --bg: #07130d;
+            --panel: #0d1e14;
+            --panel2: #10251a;
+            --green: #00c66a;
+            --green2: #008f4c;
+            --text: #e8f4ec;
+            --muted: #91a99a;
+            --border: rgba(67, 170, 105, 0.2);
+            --danger: #ff7777;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at 80% 0%, rgba(0, 150, 75, .13), transparent 30%),
+                var(--bg);
+            color: var(--text);
+            font-family: Inter, Arial, sans-serif;
+        }
+
+        header {
+            padding: 22px 7%;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            flex-wrap: wrap;
+            background: rgba(7, 19, 13, .85);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo {
+            width: 43px;
+            height: 43px;
+            border-radius: 12px;
+            display: grid;
+            place-items: center;
+            color: #06150c;
+            background: var(--green);
+            font-size: 23px;
+            font-weight: 900;
+        }
+
+        .brand h1 {
+            font-size: 23px;
+            letter-spacing: 4px;
+        }
+
+        .brand p {
+            color: var(--muted);
+            font-size: 10px;
+            letter-spacing: 2px;
+            margin-top: 4px;
+        }
+
+        .status {
+            color: var(--green);
+            font-size: 12px;
+            letter-spacing: 1px;
+        }
+
+        .status::before {
+            content: "";
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            margin-right: 8px;
+            background: var(--green);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--green);
+        }
+
+        main {
+            width: min(1100px, 88%);
+            margin: 65px auto;
+        }
+
+        .hero {
+            margin-bottom: 40px;
+        }
+
+        .eyebrow {
+            color: var(--green);
+            font-size: 11px;
+            letter-spacing: 3px;
+            margin-bottom: 15px;
+        }
+
+        .hero h2 {
+            font-size: clamp(32px, 6vw, 52px);
+            line-height: 1.12;
+            margin-bottom: 15px;
+        }
+
+        .hero h2 span {
+            color: var(--green);
+        }
+
+        .hero p {
+            color: var(--muted);
+            line-height: 1.7;
+            max-width: 620px;
+            font-size: 14px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: linear-gradient(145deg, var(--panel2), var(--panel));
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 25px;
+            min-width: 0;
+        }
+
+        .card.full {
+            grid-column: 1 / -1;
+        }
+
+        .card h3 {
+            font-size: 17px;
+            margin-bottom: 8px;
+        }
+
+        .card .description {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            color: #b9cfc0;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
+        input, textarea {
+            width: 100%;
+            background: #07150d;
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            padding: 13px;
+            outline: none;
+            font: inherit;
+            font-size: 13px;
+            margin-bottom: 13px;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        input:focus, textarea:focus {
+            border-color: var(--green);
+            box-shadow: 0 0 0 2px rgba(0, 198, 106, .08);
+        }
+
+        button {
+            border: none;
+            border-radius: 8px;
+            padding: 12px 18px;
+            background: var(--green);
+            color: #04140b;
+            font-weight: 800;
+            cursor: pointer;
+            transition: .2s;
+        }
+
+        button:hover {
+            background: #31e68d;
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            opacity: .55;
+            cursor: wait;
+            transform: none;
+        }
+
+        .output {
+            display: none;
+            margin-top: 18px;
+            padding: 15px;
+            border: 1px solid var(--border);
+            background: #07150d;
+            border-radius: 9px;
+            overflow-wrap: anywhere;
+        }
+
+        .output.visible {
+            display: block;
+        }
+
+        .output pre {
+            color: #b7e8c7;
+            font-family: "Courier New", monospace;
+            font-size: 12px;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        .error {
+            color: var(--danger) !important;
+        }
+
+        .principles {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+
+        .principle {
+            background: rgba(0, 198, 106, .045);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 17px;
+        }
+
+        .principle strong {
+            display: block;
+            color: var(--green);
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
+        .principle p {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        footer {
+            text-align: center;
+            padding: 30px 15px;
+            color: #668071;
+            border-top: 1px solid var(--border);
+            font-size: 11px;
+            letter-spacing: 1px;
+        }
+
+        @media (max-width: 700px) {
+            main {
+                margin: 40px auto;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .card.full {
+                grid-column: auto;
+            }
+
+            .principles {
+                grid-template-columns: 1fr;
+            }
+
+            header {
+                padding: 18px 6%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <div class="brand">
+        <div class="logo">S</div>
+        <div>
+            <h1>SHADOW</h1>
+            <p>INTELLIGENCE WORKBENCH</p>
+        </div>
+    </div>
+
+    <div class="status">LOCAL SYSTEM</div>
+</header>
+
+<main>
+
+    <section class="hero">
+        <div class="eyebrow">EDUCATIONAL CYBERSECURITY PROJECT / VERSION 1.0</div>
+        <h2>Think deeper.<br><span>Investigate smarter.</span></h2>
+        <p>
+            A local-first research and cybersecurity workbench.
+            Explore DNS resolution, inspect URL structures and
+            generate cryptographic hashes from one clean interface.
+        </p>
+    </section>
+
+    <section class="grid">
+
+        <article class="card">
+            <h3>01 / DNS Lookup</h3>
+            <p class="description">
+                Resolve a domain using your system's DNS resolver
+                and inspect the returned IP addresses.
+            </p>
+
+            <label for="domain">Domain name</label>
+            <input id="domain" type="text" placeholder="example.com">
+
+            <button onclick="runDNS()">Resolve Domain</button>
+            <div class="output" id="dnsOutput">
+                <pre></pre>
+            </div>
+        </article>
+
+        <article class="card">
+            <h3>02 / URL Inspector</h3>
+            <p class="description">
+                Examine URL components without visiting or connecting
+                to the destination website.
+            </p>
+
+            <label for="url">Website URL</label>
+            <input id="url" type="text" placeholder="https://example.com/path">
+
+            <button onclick="inspectURL()">Inspect URL</button>
+            <div class="output" id="urlOutput">
+                <pre></pre>
+            </div>
+        </article>
+
+        <article class="card full">
+            <h3>03 / Hash Generator</h3>
+            <p class="description">
+                Generate SHA-256, SHA-1 and MD5 hashes from text.
+                Hashes are generated locally by the Python backend.
+            </p>
+
+            <label for="hashText">Input text</label>
+            <textarea id="hashText" placeholder="Enter text to generate hashes..."></textarea>
+
+            <button onclick="generateHash()">Generate Hashes</button>
+            <div class="output" id="hashOutput">
+                <pre></pre>
+            </div>
+        </article>
+
+        <article class="card full">
+            <h3>04 / Research Principles</h3>
+            <p class="description">
+                SHADOW is designed around responsible and authorized research.
+            </p>
+
+            <div class="principles">
+                <div class="principle">
+                    <strong>01 — AUTHORIZATION</strong>
+                    <p>Use research tools only on systems and data you are permitted to examine.</p>
+                </div>
+
+                <div class="principle">
+                    <strong>02 — PRIVACY</strong>
+                    <p>Respect personal information and avoid intrusive surveillance.</p>
+                </div>
+
+                <div class="principle">
+                    <strong>03 — LEARNING</strong>
+                    <p>Build technical understanding through transparent, controlled experiments.</p>
+                </div>
+            </div>
+        </article>
+
+    </section>
+</main>
+
+<footer>
+    SHADOW © 2026 — BUILT FOR EDUCATION, RESEARCH & RESPONSIBLE LEARNING
+</footer>
+
+<script>
+    async function apiRequest(endpoint, payload, outputId) {
+        const output = document.getElementById(outputId);
+        const pre = output.querySelector("pre");
+        const buttons = document.querySelectorAll("button");
+
+        output.classList.add("visible");
+        pre.classList.remove("error");
+        pre.textContent = "Processing...";
+
+        buttons.forEach(button => button.disabled = true);
+
+        try {
+            const response = await fetch(endpoint, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || "Request failed.");
+            }
+
+            pre.textContent = JSON.stringify(data, null, 2);
+
+        } catch (error) {
+            pre.textContent = error.message || "Unable to connect to SHADOW.";
+            pre.classList.add("error");
+        } finally {
+            buttons.forEach(button => button.disabled = false);
+        }
+    }
+
+    function runDNS() {
+        const domain = document.getElementById("domain").value.trim();
+
+        if (!domain) {
+            alert("Please enter a domain name.");
+            return;
+        }
+
+        apiRequest("/api/dns", { domain }, "dnsOutput");
+    }
+
+    function inspectURL() {
+        const url = document.getElementById("url").value.trim();
+
+        if (!url) {
+            alert("Please enter a URL.");
+            return;
+        }
+
+        apiRequest("/api/url", { url }, "urlOutput");
+    }
+
+    function generateHash() {
+        const text = document.getElementById("hashText").value;
+
+        if (!text) {
+            alert("Please enter some text.");
+            return;
+        }
+
+        apiRequest("/api/hash", { text }, "hashOutput");
+    }
+</script>
+
+</body>
+</html>
